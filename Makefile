@@ -1,38 +1,45 @@
 ASM = nasm
-ASMFLAGS = -f bin
-BOOT1_TARGET = boot1.bin
-BOOT2_TARGET = boot2.bin
-KERNEL_TARGET = kernel.bin
-DISK = disk.img
+CC  = gcc
+LD  = ld
 RUN = qemu-system-x86_64
-SRCDIR = src
-BUILDDIR = build
-BINDIR = bin
-# SRC = $(SRCDIR)/boot.asm
 
-#all: $(BOOT1_TARGET) $(BOOT2_TARGET)
+SRCDIR   = src
+BINDIR   = bin
+BUILDDIR = build
+
+BOOT1  = $(BINDIR)/boot1.bin
+BOOT2  = $(BINDIR)/boot2.bin
+KERNEL = $(BINDIR)/kernel.bin
+DISK   = $(BUILDDIR)/disk.img
+
+CFLAGS = -m32 -std=gnu99 -ffreestanding -fno-pic -fno-stack-protector -O2 -c
+
+.PHONY: all run clean
+
 all: $(DISK)
 
-$(DISK): $(BOOT1_TARGET) $(BOOT2_TARGET) $(KERNEL_TARGET)
-	dd if=/dev/zero of=$(BUILDDIR)/disk.img bs=1k count=1440 status=none conv=notrunc
-	dd if=$(BINDIR)/$(BOOT1_TARGET) of=$(BUILDDIR)/disk.img bs=512 count=1 conv=notrunc
-	dd if=$(BINDIR)/$(BOOT2_TARGET) of=$(BUILDDIR)/disk.img bs=512 seek=1 conv=notrunc
-	dd if=$(BINDIR)/$(KERNEL_TARGET) of=$(BUILDDIR)/disk.img bs=512 seek=2 conv=notrunc
+$(BINDIR) $(BUILDDIR):
+	mkdir -p $@
 
-$(BOOT1_TARGET): $(SRCDIR)/boot1.asm
-	$(ASM) $(ASMFLAGS) $(SRCDIR)/boot1.asm -o $(BINDIR)/$(BOOT1_TARGET)
+$(BOOT1): $(SRCDIR)/boot1.asm | $(BINDIR)
+	$(ASM) -f bin $< -o $@
 
-$(BOOT2_TARGET): $(SRCDIR)/boot2.asm
-	$(ASM) $(ASMFLAGS) $(SRCDIR)/boot2.asm -o $(BINDIR)/$(BOOT2_TARGET)
+$(BOOT2): $(SRCDIR)/boot2.asm | $(BINDIR)
+	$(ASM) -f bin $< -o $@
 
-$(KERNEL_TARGET): $(SRCDIR)/kernel.asm $(SRCDIR)/kernel.c
+$(KERNEL): $(SRCDIR)/kernel.asm $(SRCDIR)/kernel.c linker.ld | $(BINDIR)
 	$(ASM) -f elf32 $(SRCDIR)/kernel.asm -o $(BINDIR)/kasm.o
-	gcc -m32 -c $(SRCDIR)/kernel.c -o $(BINDIR)/kc.o -std=gnu99 -ffreestanding -fno-pic -O2
-	ld -m elf_i386 -T linker.ld -o $(BINDIR)/kernel.bin $(BINDIR)/kasm.o $(BINDIR)/kc.o --oformat binary
+	$(CC) $(CFLAGS) $(SRCDIR)/kernel.c -o $(BINDIR)/kc.o
+	$(LD) -m elf_i386 -T linker.ld -o $@ $(BINDIR)/kasm.o $(BINDIR)/kc.o --oformat binary
 
+$(DISK): $(BOOT1) $(BOOT2) $(KERNEL) | $(BUILDDIR)
+	dd if=/dev/zero of=$@ bs=1k count=1440 status=none
+	dd if=$(BOOT1)  of=$@ bs=512 count=1 conv=notrunc status=none
+	dd if=$(BOOT2)  of=$@ bs=512 seek=1 conv=notrunc status=none
+	dd if=$(KERNEL) of=$@ bs=512 seek=2 conv=notrunc status=none
 
 run: $(DISK)
-	$(RUN) -fda $(BUILDDIR)/$(DISK)
+	$(RUN) -fda $(DISK)
 
 clean:
-	rm -f $(BINDIR)/$(BOOT1_TARGET) $(BINDIR)/$(BOOT2_TARGET) $(BINDIR)/$(KERNEL_TARGET) $(BINDIR)/kasm.o $(BINDIR)/kc.o $(BUILDDIR)/$(DISK)
+	rm -rf $(BINDIR) $(BUILDDIR)
