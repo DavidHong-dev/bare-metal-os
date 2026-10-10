@@ -85,4 +85,4 @@ make clean    # delete bin/ and build/
 
 ## License
 
-This project is licensed under the MIT License. See the [MIT](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
