@@ -84,3 +84,5 @@ make clean    # delete bin/ and build/
 - [ ] Load a larger kernel (multi-sector / more flexible loading)
 
 ## License
+
+This project is licensed under the MIT License. See the [MIT](LICENSE) file for details.
